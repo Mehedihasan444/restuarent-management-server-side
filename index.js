@@ -59,14 +59,52 @@ async function run() {
 
         const userCollection = client.db('restaurantManagementDB').collection('Users')
         const foodCollection = client.db('restaurantManagementDB').collection('Foods')
+        const sliderCollection = client.db('restaurantManagementDB').collection('HomeBannerSlider')
+        const orderCollection = client.db('restaurantManagementDB').collection('Orders')
+
+
+        // getting all home banner slider data
+        app.get('/api/v1/home-banner-slider', async (req, res) => {
+            const result = await sliderCollection.find().toArray();
+            res.send(result);
+        })
 
         // getting all foods
         app.get('/api/v1/foods', async (req, res) => {
             const result = await foodCollection.find().toArray();
             res.send(result)
         })
+
+        // get orders
+        app.get('/api/v1/user/food-orders/:userEmail', async (req, res) => {
+            const userEmail = req.params.userEmail; // Get the user's email from the query parameter
+            // console.log(userEmail);
+            if (!userEmail) {
+                return res.status(400).send('User email is required.');
+            }
+            const query = { userEmail: userEmail }
+            const result = await orderCollection.find(query).toArray();
+            res.send(result);
+        });
+        // get add foods
+        app.get('/api/v1/user/added-foods/:userEmail', async (req, res) => {
+            const userEmail = req.params.userEmail; // Get the user's email from the query parameter
+            // console.log(userEmail);
+            if (!userEmail) {
+                return res.status(400).send('User email is required.');
+            }
+            const query = { userEmail: userEmail }
+            const result = await foodCollection.find(query).toArray();
+            res.send(result);
+        });
+
+
+
+
+
+
         // getting all foods
-        app.get('/api/v1/foods/:foodId', async (req, res) => {
+        app.get('/api/v1/foodDetails/:foodId', async (req, res) => {
             const id = req.params.foodId;
             const query = { _id: new ObjectId(id) }
             // const options =  {
@@ -96,6 +134,13 @@ async function run() {
             const result = await foodCollection.insertOne(food)
             res.send(result)
         })
+        // placed order
+        app.post('/api/v1/user/food-order', async (req, res) => {
+            const order = req.body;
+            const result = await orderCollection.insertOne(order)
+            res.send(result)
+        })
+
 
         // delete a food
         app.delete('/api/v1/user/delete-food/:foodId', async (req, res) => {
