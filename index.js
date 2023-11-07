@@ -70,10 +70,39 @@ async function run() {
         })
 
         // getting all foods
+        // pagination
+        // filtering
+        // food count
+        // searching
+        
         app.get('/api/v1/foods', async (req, res) => {
-            const result = await foodCollection.find().toArray();
-            res.send(result)
+            let queryObj = {};
+            let sortObj = {};
+            const category = req.query.category;
+            const sortField = req.query.sortField;
+            const sortOrder = req.query.sortOrder;
+            const page = Number(req.query.page);
+            const limit = Number(req.query.limit);
+            const skip = (page - 1) * limit;
+            const foodName = req.query.foodName;
+            // console.log(category,sortField,sortOrder,page,limit,skip);
+            if (category) {
+                queryObj.foodCategory = category;
+            }
+            if (sortField && sortOrder) {
+                sortObj[sortField] = sortOrder;
+            }
+            if (foodName) {
+                const searchTerm = new RegExp(foodName, 'i'); // 'i' for case-insensitive search
+                queryObj.foodName = searchTerm;
+            }
+            const count = await foodCollection.estimatedDocumentCount();
+            const result = await foodCollection.find(queryObj).skip(skip).limit(limit).sort(sortObj).toArray();
+            // console.log({ result, count });
+            res.send({ result, count })
         })
+
+
 
         // get orders
         app.get('/api/v1/user/food-orders/:userEmail', async (req, res) => {
@@ -97,9 +126,6 @@ async function run() {
             const result = await foodCollection.find(query).toArray();
             res.send(result);
         });
-
-
-
 
 
 
@@ -145,6 +171,7 @@ async function run() {
         // delete a food
         app.delete('/api/v1/user/delete-food/:foodId', async (req, res) => {
             const id = req.params.foodId;
+            console.log(id);
             const query = { _id: new ObjectId(id) }
             const result = await foodCollection.deleteOne(query);
             res.send(result)
