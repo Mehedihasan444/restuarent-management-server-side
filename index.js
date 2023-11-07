@@ -116,15 +116,28 @@ async function run() {
             res.send(result);
         });
         // get add foods
-        app.get('/api/v1/user/added-foods/:userEmail', async (req, res) => {
-            const userEmail = req.params.userEmail; // Get the user's email from the query parameter
+        app.get('/api/v1/user/added-foods', async (req, res) => {
+            let userEmailObj = {};
+            let foodIdObj = {};
+            const userEmail = req.query.userEmail; // Get the user's email from the query parameter
+            const foodId = req.query.foodId; // Get the user's email from the query parameter
             // console.log(userEmail);
+            // console.log(foodId); 
             if (!userEmail) {
                 return res.status(400).send('User email is required.');
             }
-            const query = { userEmail: userEmail }
-            const result = await foodCollection.find(query).toArray();
-            res.send(result);
+            if (userEmail) {
+                userEmailObj.userEmail=userEmail;
+            }
+            if (foodId) {
+                foodIdObj._id=new ObjectId(foodId);
+                foodIdObj.userEmail=userEmail;
+            }
+            // const query = { userEmail: userEmail }
+
+            const SingleResult = await foodCollection.findOne(foodIdObj);
+            const result = await foodCollection.find(userEmailObj).toArray();
+            res.send({result,SingleResult});
         });
 
 
@@ -176,6 +189,15 @@ async function run() {
             const result = await foodCollection.deleteOne(query);
             res.send(result)
         })
+// delete a order
+
+app.delete('/api/v1/user/delete-order/:orderId', async (req, res) => {
+const orderId = req.params.orderId;
+const query = { _id: new ObjectId(orderId)}
+const result = await orderCollection.deleteOne(query);
+res.send(result)
+});
+
 
         // update a food
         app.put('/api/v1/user/update-food/:foodId', async (req, res) => {
@@ -185,11 +207,18 @@ async function run() {
             const options = { upsert: true }
             const updateDoc = {
                 $set: {
-
+                    foodName:updatedFood.foodName,
+                    foodImage:updatedFood.foodImage,
+                    foodCategory:updatedFood.foodCategory,
+                    quantity:updatedFood.quantity,
+                    price:updatedFood.price,
+                    foodOrigin:updatedFood.foodOrigin,
+                    shortDescription:updatedFood.shortDescription
                 },
 
             };
             const result = await foodCollection.updateOne(filter, updateDoc, options)
+            res.send(result)
         })
 
         // Send a ping to confirm a successful connection
