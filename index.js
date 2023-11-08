@@ -74,7 +74,7 @@ async function run() {
         // filtering
         // food count
         // searching
-        
+
         app.get('/api/v1/foods', async (req, res) => {
             let queryObj = {};
             let sortObj = {};
@@ -101,6 +101,24 @@ async function run() {
             // console.log({ result, count });
             res.send({ result, count })
         })
+        //update quantity
+        app.put('/api/v1/foods/:foodId', async (req, res) => {
+            const id = req.params.foodId;
+            const updatedFood = req.body;
+            console.log(updatedFood);
+            const filter = { _id: new ObjectId(id) };
+            const options = { upsert: true }
+            const updateDoc = {
+                $set: {
+                    quantity: updatedFood.quantity,
+                    sellCount: updatedFood.sellCount
+                },
+
+            };
+            const result = await foodCollection.updateOne(filter, updateDoc, options)
+            console.log(result);
+            res.send(result)
+        })
 
 
 
@@ -119,25 +137,25 @@ async function run() {
         app.get('/api/v1/user/added-foods', async (req, res) => {
             let userEmailObj = {};
             let foodIdObj = {};
-            const userEmail = req.query.userEmail; // Get the user's email from the query parameter
-            const foodId = req.query.foodId; // Get the user's email from the query parameter
+            const userEmail = req.query.userEmail; 
+            const foodId = req.query.foodId; 
             // console.log(userEmail);
             // console.log(foodId); 
             if (!userEmail) {
                 return res.status(400).send('User email is required.');
             }
             if (userEmail) {
-                userEmailObj.userEmail=userEmail;
+                userEmailObj.userEmail = userEmail;
             }
             if (foodId) {
-                foodIdObj._id=new ObjectId(foodId);
-                foodIdObj.userEmail=userEmail;
+                foodIdObj._id = new ObjectId(foodId);
+                foodIdObj.userEmail = userEmail;
             }
             // const query = { userEmail: userEmail }
 
             const SingleResult = await foodCollection.findOne(foodIdObj);
             const result = await foodCollection.find(userEmailObj).toArray();
-            res.send({result,SingleResult});
+            res.send({ result, SingleResult });
         });
 
 
@@ -173,6 +191,13 @@ async function run() {
             const result = await foodCollection.insertOne(food)
             res.send(result)
         })
+
+
+        // top selling food api
+        app.get('/api/v1/foods/desc', async (req, res) => {
+            const result = await foodCollection.find().sort({ sellCount: 'desc' }).toArray();
+            res.send(result);
+        })
         // placed order
         app.post('/api/v1/user/food-order', async (req, res) => {
             const order = req.body;
@@ -189,14 +214,14 @@ async function run() {
             const result = await foodCollection.deleteOne(query);
             res.send(result)
         })
-// delete a order
+        // delete a order
 
-app.delete('/api/v1/user/delete-order/:orderId', async (req, res) => {
-const orderId = req.params.orderId;
-const query = { _id: new ObjectId(orderId)}
-const result = await orderCollection.deleteOne(query);
-res.send(result)
-});
+        app.delete('/api/v1/user/delete-order/:orderId', async (req, res) => {
+            const orderId = req.params.orderId;
+            const query = { _id: new ObjectId(orderId) }
+            const result = await orderCollection.deleteOne(query);
+            res.send(result)
+        });
 
 
         // update a food
@@ -207,13 +232,13 @@ res.send(result)
             const options = { upsert: true }
             const updateDoc = {
                 $set: {
-                    foodName:updatedFood.foodName,
-                    foodImage:updatedFood.foodImage,
-                    foodCategory:updatedFood.foodCategory,
-                    quantity:updatedFood.quantity,
-                    price:updatedFood.price,
-                    foodOrigin:updatedFood.foodOrigin,
-                    shortDescription:updatedFood.shortDescription
+                    foodName: updatedFood.foodName,
+                    foodImage: updatedFood.foodImage,
+                    foodCategory: updatedFood.foodCategory,
+                    quantity: updatedFood.quantity,
+                    price: updatedFood.price,
+                    foodOrigin: updatedFood.foodOrigin,
+                    shortDescription: updatedFood.shortDescription
                 },
 
             };
