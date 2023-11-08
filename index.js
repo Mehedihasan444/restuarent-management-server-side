@@ -12,7 +12,9 @@ const port = process.env.PORT || 5000;
 app.use(cors(
     {
         origin: [
-            'http://localhost:5173'
+            // 'http://localhost:5173'
+            'https://restaurant-management-server-side.vercel.app/',
+            'https://restaurant-management-6fce7.web.app'
         ],
         credentials: true
     }
@@ -38,7 +40,7 @@ const client = new MongoClient(uri, {
 
 const verifyToken = (req, res, next) => {
     const token = req?.cookies?.token;
-
+console.log(token);
     if (!token) {
         return res.status(401).send({ message: 'Unauthorized access' })
     }
@@ -46,8 +48,8 @@ const verifyToken = (req, res, next) => {
         if (error) {
             return res.status(403).send({ message: 'forbidden access' })
         }
-        res.user = decoded;
-        next();
+        req.user = decoded;
+        next()
     })
 }
 
@@ -123,12 +125,17 @@ async function run() {
 
 
         // get orders
-        app.get('/api/v1/user/food-orders/:userEmail', async (req, res) => {
-            const userEmail = req.params.userEmail; // Get the user's email from the query parameter
-            // console.log(userEmail);
+        app.get('/api/v1/user/food-orders/:userEmail', verifyToken, async (req, res) => {
+            const userEmail = req.params.userEmail; 
+            console.log(userEmail);
             if (!userEmail) {
                 return res.status(400).send('User email is required.');
             }
+            console.log("emailCom",req.user.email,userEmail);
+            if (req.user.email !== userEmail) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+
             const query = { userEmail: userEmail }
             const result = await orderCollection.find(query).toArray();
             res.send(result);
@@ -137,8 +144,8 @@ async function run() {
         app.get('/api/v1/user/added-foods', async (req, res) => {
             let userEmailObj = {};
             let foodIdObj = {};
-            const userEmail = req.query.userEmail; 
-            const foodId = req.query.foodId; 
+            const userEmail = req.query.userEmail;
+            const foodId = req.query.foodId;
             // console.log(userEmail);
             // console.log(foodId); 
             if (!userEmail) {
@@ -179,10 +186,16 @@ async function run() {
 
             res.cookie('token', token, {
                 httpOnly: true,
-                secure: false,
+                secure: true,
                 sameSite: 'none'
             }).send({ success: true })
+
         })
+        app.post('/logOut', async (req, res) => {
+            const user = req.body;
+            res.clearCookie('token', { maxAge: 0 }).send({ success: true })
+        })
+
 
 
         // add a food 
