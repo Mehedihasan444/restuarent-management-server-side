@@ -9,10 +9,10 @@ const port = process.env.PORT || 5000;
 
 
 // middleware
+// 'http://localhost:5173'
 app.use(cors(
     {
         origin: [
-            // 'http://localhost:5173'
             'https://restaurant-management-server-side.vercel.app/',
             'https://restaurant-management-6fce7.web.app'
         ],
