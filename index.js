@@ -9,13 +9,14 @@ const port = process.env.PORT || 5000;
 
 
 // middleware
-// 'http://localhost:5173'
 app.use(cors(
     {
         origin: [
+            // 'http://localhost:5173',
             'https://restaurant-management-server-side.vercel.app/',
             'https://restaurant-management-6fce7.web.app'
-        ],
+        // 
+    ],
         credentials: true
     }
 ))
@@ -40,7 +41,7 @@ const client = new MongoClient(uri, {
 
 const verifyToken = (req, res, next) => {
     const token = req?.cookies?.token;
-// console.log(token);
+    // console.log(token);
     if (!token) {
         return res.status(401).send({ message: 'Unauthorized access' })
     }
@@ -126,17 +127,21 @@ async function run() {
 
         // get orders
         app.get('/api/v1/user/food-orders/:userEmail', verifyToken, async (req, res) => {
-            const userEmail = req.params.userEmail; 
+            const userEmail = req.params.userEmail;
             console.log(userEmail);
-            if (!userEmail) {
-                return res.status(400).send('User email is required.');
-            }
-            console.log("emailCom",req.user.email,userEmail);
-            if (req.user.email !== userEmail) {
+            // if (!userEmail) {
+            //     return res.status(400).send('User email is required.');
+            // }
+            console.log("veri",req.user.email.toLowerCase() );
+            console.log("req", userEmail);
+            if (req.user.email.toLowerCase() !== userEmail) {
                 return res.status(403).send({ message: 'forbidden access' })
             }
-
-            const query = { userEmail: userEmail }
+            let query={}
+            if (userEmail) {
+                // query = { email: req.query.email }
+                 query = { userEmail: userEmail }
+            }
             const result = await orderCollection.find(query).toArray();
             res.send(result);
         });
