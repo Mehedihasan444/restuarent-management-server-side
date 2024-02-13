@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const SSLCommerzPayment = require("sslcommerz-lts");
 const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
@@ -10,10 +11,14 @@ const port = process.env.PORT || 5000;
 // middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      // "https://65c937eda4e7cf5f6756c714--comfy-kataifi-8435e8.netlify.app"
+    ],
     credentials: true,
   })
 );
+// "https://65c933bae29cb75f8186ac1d--comfy-kataifi-8435e8.netlify.app",
 app.use(express.json());
 app.use(cookieParser());
 
@@ -28,6 +33,10 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+
+const store_id = process.env.storeID;
+const store_passwd = process.env.storePasswd;
+const is_live = false; //true for live, false for sandbox
 
 // custom made middlewares
 
@@ -51,11 +60,21 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
 
-    const userCollection = client.db("restaurantManagementDB").collection("Users");
-    const foodCollection = client.db("restaurantManagementDB").collection("Foods");
-    const sliderCollection = client.db("restaurantManagementDB").collection("HomeBannerSlider");
-    const orderCollection = client.db("restaurantManagementDB").collection("Orders");
-    const cartCollection = client.db("restaurantManagementDB").collection("cartItems");
+    const userCollection = client
+      .db("restaurantManagementDB")
+      .collection("Users");
+    const foodCollection = client
+      .db("restaurantManagementDB")
+      .collection("Foods");
+    const sliderCollection = client
+      .db("restaurantManagementDB")
+      .collection("HomeBannerSlider");
+    const orderCollection = client
+      .db("restaurantManagementDB")
+      .collection("Orders");
+    const cartCollection = client
+      .db("restaurantManagementDB")
+      .collection("cartItems");
 
     // user related api
     app.post("/api/v1/users", async (req, res) => {
@@ -241,6 +260,174 @@ async function run() {
         .toArray();
       res.send(result);
     });
+
+    const tran_id = new ObjectId().toString();
+
+    app.post("/api/v1/user/food/payment/:id", async (req, res) => {
+      const orderId = req.params.id;
+      const query = {
+        _id: new ObjectId(orderId),
+      };
+      const order = await orderCollection.findOne(query);
+
+      const data = {
+        total_amount: order.price,
+        currency: "USD",
+        tran_id: tran_id,
+        success_url: `http://localhost:5000/api/v1/user/payment/success/${tran_id}?orderId=${order._id}`,
+        fail_url: `http://localhost:5000/api/v1/user/payment/fail/${tran_id}?orderId=${order._id}`,
+        cancel_url: "http://localhost:3030/cancel",
+        ipn_url: "http://localhost:3030/ipn",
+        shipping_method: "Courier",
+        product_name: order.foodName,
+        product_category: order.foodCategory,
+        product_profile: "general",
+        cus_name: order.userName,
+        cus_email: order.userEmail,
+        cus_add1: "Dhaka",
+        cus_add2: "Dhaka",
+        cus_city: "Dhaka",
+        cus_state: "Dhaka",
+        cus_postcode: "1000",
+        cus_country: "Bangladesh",
+        cus_phone: "01711111111",
+        cus_fax: "01711111111",
+        ship_name: order.userName,
+        ship_add1: "Dhaka",
+        ship_add2: "Dhaka",
+        ship_city: "Dhaka",
+        ship_state: "Dhaka",
+        ship_postcode: 1000,
+        ship_country: "Bangladesh",
+      };
+      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+      sslcz.init(data).then((apiResponse) => {
+        // Redirect the user to payment gateway
+        let GatewayPageURL = apiResponse.GatewayPageURL;
+        res.send({ url: GatewayPageURL });
+        console.log("Redirecting to: ", GatewayPageURL);
+      });
+
+      app.post("/api/v1/user/payment/success/:tranId", async (req, res) => {
+        const result = await orderCollection.updateOne(
+          { _id: new ObjectId(req.query.orderId) },
+          {
+            $set: {
+              payment: "complete",
+              transactionId: req.params.tranId,
+            },
+          }
+        );
+        if (result.modifiedCount > 0) {
+          res.redirect(
+            `http://localhost:5173/api/v1/payment-complete/${req.params.tranId}`
+          );
+        }
+      });
+      app.post("/api/v1/user/payment/fail/:tranId", async (req, res) => {
+        const result = await orderCollection.updateOne(
+          { _id: new ObjectId(req.query.orderId) },
+          {
+            $set: {
+              payment: "failed",
+              // transactionId: req.params.tranId
+            },
+          }
+        );
+        if (result.modifiedCount > 0) {
+          res.redirect(
+            `http://localhost:5173/api/v1/payment-failed/${req.params.tranId}`
+          );
+        }
+      });
+    });
+    // working
+    app.post("/api/v1/user/foods/payment", async (req, res) => {
+      const id = new ObjectId().toString();
+      const cartItem = req.body;
+      const info = {
+        ...cartItem,
+        code: id,
+      };
+      const result = await orderCollection.insertOne(info);
+
+      const data = {
+        total_amount: cartItem.totalBill,
+        currency: "USD",
+        tran_id: tran_id,
+        success_url: `http://localhost:5000/api/v1/user/payment/success/${tran_id}?code=${id}`,
+        fail_url: `http://localhost:5000/api/v1/user/payment/fail/${tran_id}?code=${id}`,
+        cancel_url: "http://localhost:3030/cancel",
+        ipn_url: "http://localhost:3030/ipn",
+        shipping_method: "Courier",
+        product_name: "combine food",
+        product_category: "Mix category",
+        product_profile: "general",
+        cus_name: cartItem.userName,
+        cus_email: cartItem.userEmail,
+        cus_add1: "Dhaka",
+        cus_add2: "Dhaka",
+        cus_city: "Dhaka",
+        cus_state: "Dhaka",
+        cus_postcode: "1000",
+        cus_country: "Bangladesh",
+        cus_phone: "01711111111",
+        cus_fax: "01711111111",
+        ship_name: cartItem.userName,
+        ship_add1: "Dhaka",
+        ship_add2: "Dhaka",
+        ship_city: "Dhaka",
+        ship_state: "Dhaka",
+        ship_postcode: 1000,
+        ship_country: "Bangladesh",
+      };
+      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+      sslcz.init(data).then((apiResponse) => {
+        // Redirect the user to payment gateway
+        let GatewayPageURL = apiResponse.GatewayPageURL;
+        res.send({ url: GatewayPageURL });
+        console.log("Redirecting to: ", GatewayPageURL);
+      });
+
+      app.post("/api/v1/user/payment/success/:tranId", async (req, res) => {
+        const result = await orderCollection.updateOne(
+          { code: req.query.code },
+          {
+            $set: {
+              payment: "complete",
+              transactionId: req.params.tranId,
+            },
+          }
+        );
+        if (result.modifiedCount > 0) {
+          res.redirect(
+            `http://localhost:5173/api/v1/payment-complete/${req.params.tranId}`
+          );
+        }
+
+        const cart = await cartCollection.find().toArray();
+        const ids = cart.map((x) => x._id);
+        const query = { _id: { $in: ids } };
+        await cartCollection.deleteMany(query);
+      });
+      app.post("/api/v1/user/payment/fail/:tranId", async (req, res) => {
+        const result = await orderCollection.updateOne(
+          { code: req.query.code },
+          {
+            $set: {
+              payment: "failed",
+              // transactionId: req.params.tranId
+            },
+          }
+        );
+        if (result.modifiedCount > 0) {
+          res.redirect(
+            `http://localhost:5173/api/v1/payment-failed/${req.params.tranId}`
+          );
+        }
+      });
+    });
+
     // placed order
     app.post("/api/v1/user/food-order", async (req, res) => {
       const order = req.body;
@@ -286,30 +473,26 @@ async function run() {
       res.send(result);
     });
 
-    
-// cart related api
+    // cart related api
 
-app.post("/api/v1/user/cart",async(req, res)=>{
-const data=req.body;
+    app.post("/api/v1/user/cart", async (req, res) => {
+      const data = req.body;
 
-const result=await cartCollection.insertOne(data);
-})
+      const result = await cartCollection.insertOne(data);
+    });
 
-app.get("/api/v1/user/cart/:email",async(req, res)=>{
-  const email=req.params.email;
-  const result=await cartCollection.find({userEmail:email}).toArray();
-  res.send(result);
-})
-app.delete("/api/v1/user/cart/delete-item/:itemId", async (req, res) => {
-  const itemId = req.params.itemId;
-  console.log(itemId)
-  const query = { _id: new ObjectId(itemId) };
-  const result = await cartCollection.deleteOne(query);
-  res.send(result);
-});
-
-
-
+    app.get("/api/v1/user/cart/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await cartCollection.find({ userEmail: email }).toArray();
+      res.send(result);
+    });
+    app.delete("/api/v1/user/cart/delete-item/:itemId", async (req, res) => {
+      const itemId = req.params.itemId;
+      console.log(itemId);
+      const query = { _id: new ObjectId(itemId) };
+      const result = await cartCollection.deleteOne(query);
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
